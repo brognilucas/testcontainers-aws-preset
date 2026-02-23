@@ -68,3 +68,5 @@ export type {
   DynamoDBKeySchema,
   DynamoDBKeyType,
 } from './presets/dynamodb.js';
+export { createS3SqsPreset } from './presets/s3-sqs.js';
+export type { S3SqsPresetOptions, S3SqsPreset } from './presets/s3-sqs.js';
