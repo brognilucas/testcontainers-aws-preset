@@ -1,0 +1,110 @@
+import { CreateSecretCommand, SecretsManagerClient } from '@aws-sdk/client-secrets-manager';
+import { LocalstackContainer } from '@testcontainers/localstack';
+import type { AwsPresetCredentials, AwsPresetOptions, LocalStackAwsPreset } from '../index.js';
+import { validateAwsPresetOptions } from '../lib/validate-options.js';
+
+const DEFAULT_LOCALSTACK_IMAGE = 'localstack/localstack:3.0';
+const DEFAULT_CREDENTIALS: AwsPresetCredentials = {
+  accessKeyId: 'test',
+  secretAccessKey: 'test',
+};
+
+export interface SeedSecret {
+  name: string;
+  secretString: string;
+}
+
+export interface SecretsManagerPresetOptions extends AwsPresetOptions {
+  seedSecrets?: SeedSecret[];
+}
+
+export interface SecretsManagerPreset extends LocalStackAwsPreset {}
+
+function validateSecretsManagerPresetOptions(
+  options: unknown
+): asserts options is SecretsManagerPresetOptions {
+  validateAwsPresetOptions(options);
+  const opts = options as SecretsManagerPresetOptions;
+  if (opts !== undefined && 'seedSecrets' in opts && opts.seedSecrets !== undefined) {
+    if (!Array.isArray(opts.seedSecrets)) {
+      throw new Error('seedSecrets must be an array when provided');
+    }
+    for (let i = 0; i < opts.seedSecrets.length; i++) {
+      const entry = opts.seedSecrets[i];
+      if (typeof entry !== 'object' || entry === null) {
+        throw new Error(`seedSecrets[${i}] must be { name: string, secretString: string }`);
+      }
+      if (typeof entry.name !== 'string' || entry.name.trim() === '') {
+        throw new Error(`seedSecrets[${i}].name must be a non-empty string`);
+      }
+      if (typeof entry.secretString !== 'string') {
+        throw new Error(`seedSecrets[${i}].secretString must be a string`);
+      }
+    }
+  }
+}
+
+function createSecretsManagerClient(
+  connectionUri: string,
+  region: string,
+  credentials: AwsPresetCredentials
+): SecretsManagerClient {
+  return new SecretsManagerClient({
+    endpoint: connectionUri,
+    region,
+    credentials,
+  });
+}
+
+export function createSecretsManagerPreset(
+  options?: SecretsManagerPresetOptions
+): SecretsManagerPreset {
+  validateSecretsManagerPresetOptions(options);
+  const resolvedOptions: SecretsManagerPresetOptions = Object.freeze({
+    region: 'us-east-1',
+    ...(options ?? {}),
+    seedSecrets: options?.seedSecrets ?? [],
+  });
+
+  let startedContainer: Awaited<ReturnType<LocalstackContainer['start']>> | null = null;
+
+  return {
+    get options(): SecretsManagerPresetOptions {
+      return resolvedOptions;
+    },
+    async start(): Promise<void> {
+      const container = new LocalstackContainer(DEFAULT_LOCALSTACK_IMAGE);
+      startedContainer = await container.start();
+      const connectionUri = startedContainer.getConnectionUri();
+      const region = resolvedOptions.region ?? 'us-east-1';
+      const client = createSecretsManagerClient(
+        connectionUri,
+        region,
+        DEFAULT_CREDENTIALS
+      );
+      for (const seed of resolvedOptions.seedSecrets ?? []) {
+        await client.send(
+          new CreateSecretCommand({
+            Name: seed.name,
+            SecretString: seed.secretString,
+          })
+        );
+      }
+    },
+    async stop(): Promise<void> {
+      if (startedContainer) {
+        await startedContainer.stop();
+        startedContainer = null;
+      }
+    },
+    getConnectionUri(): string {
+      if (!startedContainer) {
+        throw new Error('Preset not started; call start() first');
+      }
+      return startedContainer.getConnectionUri();
+    },
+    getCredentials(): AwsPresetCredentials {
+      return { ...DEFAULT_CREDENTIALS };
+    },
+  };
+}

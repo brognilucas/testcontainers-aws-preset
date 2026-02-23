@@ -70,3 +70,9 @@ export type {
 } from './presets/dynamodb.js';
 export { createS3SqsPreset } from './presets/s3-sqs.js';
 export type { S3SqsPresetOptions, S3SqsPreset } from './presets/s3-sqs.js';
+export { createSecretsManagerPreset } from './presets/secrets-manager.js';
+export type {
+  SecretsManagerPresetOptions,
+  SecretsManagerPreset,
+  SeedSecret,
+} from './presets/secrets-manager.js';
