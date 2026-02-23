@@ -1,6 +1,6 @@
 import { CreateSecretCommand, SecretsManagerClient } from '@aws-sdk/client-secrets-manager';
 import { LocalstackContainer } from '@testcontainers/localstack';
-import type { AwsPresetCredentials, AwsPresetOptions, LocalStackAwsPreset } from '../index.js';
+import type { AwsPresetCredentials, AwsPresetOptions, LocalStackAwsPreset, SharedConnection } from '../index.js';
 import { validateAwsPresetOptions } from '../lib/validate-options.js';
 
 const DEFAULT_LOCALSTACK_IMAGE = 'localstack/localstack:3.0';
@@ -67,20 +67,30 @@ export function createSecretsManagerPreset(
   });
 
   let startedContainer: Awaited<ReturnType<LocalstackContainer['start']>> | null = null;
+  let sharedConnection: SharedConnection | null = null;
 
   return {
     get options(): SecretsManagerPresetOptions {
       return resolvedOptions;
     },
-    async start(): Promise<void> {
-      const container = new LocalstackContainer(DEFAULT_LOCALSTACK_IMAGE);
-      startedContainer = await container.start();
-      const connectionUri = startedContainer.getConnectionUri();
+    async start(shared?: SharedConnection): Promise<void> {
       const region = resolvedOptions.region ?? 'us-east-1';
+      let connectionUri: string;
+      let credentials: AwsPresetCredentials;
+      if (shared) {
+        sharedConnection = shared;
+        connectionUri = shared.getConnectionUri();
+        credentials = shared.getCredentials();
+      } else {
+        const container = new LocalstackContainer(DEFAULT_LOCALSTACK_IMAGE);
+        startedContainer = await container.start();
+        connectionUri = startedContainer.getConnectionUri();
+        credentials = DEFAULT_CREDENTIALS;
+      }
       const client = createSecretsManagerClient(
         connectionUri,
-        region,
-        DEFAULT_CREDENTIALS
+        shared?.getRegion() ?? region,
+        credentials
       );
       for (const seed of resolvedOptions.seedSecrets ?? []) {
         await client.send(
@@ -96,14 +106,15 @@ export function createSecretsManagerPreset(
         await startedContainer.stop();
         startedContainer = null;
       }
+      sharedConnection = null;
     },
     getConnectionUri(): string {
-      if (!startedContainer) {
-        throw new Error('Preset not started; call start() first');
-      }
-      return startedContainer.getConnectionUri();
+      if (startedContainer) return startedContainer.getConnectionUri();
+      if (sharedConnection) return sharedConnection.getConnectionUri();
+      throw new Error('Preset not started; call start() first');
     },
     getCredentials(): AwsPresetCredentials {
+      if (sharedConnection) return sharedConnection.getCredentials();
       return { ...DEFAULT_CREDENTIALS };
     },
     getConnectionConfig() {

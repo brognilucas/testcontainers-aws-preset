@@ -6,6 +6,7 @@ import {
   createDynamoDBPreset,
   createS3SqsPreset,
   createSecretsManagerPreset,
+  createSharedPreset,
 } from '../index';
 
 describe('Preset lifecycle: start and stop for setup and teardown hooks', () => {
@@ -18,6 +19,7 @@ describe('Preset lifecycle: start and stop for setup and teardown hooks', () => 
       createDynamoDBPreset,
       createS3SqsPreset,
       createSecretsManagerPreset,
+      () => createSharedPreset({ sqs: createSqsPreset() }),
     ] as const;
     for (const create of factories) {
       const preset = create();

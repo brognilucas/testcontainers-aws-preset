@@ -27,6 +27,12 @@ export interface AwsPresetConnectionConfig {
   region: string;
 }
 
+export interface SharedConnection {
+  getConnectionUri(): string;
+  getCredentials(): AwsPresetCredentials;
+  getRegion(): string;
+}
+
 export interface AwsPreset {
   /** Resolved options used to create this preset (read-only). */
   readonly options: AwsPresetOptions;
@@ -38,6 +44,7 @@ export interface LocalStackAwsPreset extends AwsPreset {
   getConnectionUri(): string;
   getCredentials(): AwsPresetCredentials;
   getConnectionConfig(): AwsPresetConnectionConfig;
+  start(sharedConnection?: SharedConnection): Promise<void>;
 }
 
 import { validateAwsPresetOptions } from './lib/validate-options.js';
@@ -83,3 +90,5 @@ export type {
   SecretsManagerPreset,
   SeedSecret,
 } from './presets/secrets-manager.js';
+export { createSharedPreset } from './presets/shared.js';
+export type { SharedPreset } from './presets/shared.js';

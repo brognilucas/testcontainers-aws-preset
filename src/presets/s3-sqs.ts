@@ -10,7 +10,7 @@ import {
   SQSClient,
 } from '@aws-sdk/client-sqs';
 import { LocalstackContainer } from '@testcontainers/localstack';
-import type { AwsPresetCredentials, AwsPresetOptions, LocalStackAwsPreset } from '../index.js';
+import type { AwsPresetCredentials, AwsPresetOptions, LocalStackAwsPreset, SharedConnection } from '../index.js';
 import { validateAwsPresetOptions } from '../lib/validate-options.js';
 
 const DEFAULT_LOCALSTACK_IMAGE = 'localstack/localstack:3.0';
@@ -98,19 +98,29 @@ export function createS3SqsPreset(options?: S3SqsPresetOptions): S3SqsPreset {
   });
 
   let startedContainer: Awaited<ReturnType<LocalstackContainer['start']>> | null = null;
+  let sharedConnection: SharedConnection | null = null;
   let bucketNameAfterStart: string | null = null;
 
   return {
     get options(): S3SqsPresetOptions {
       return resolvedOptions;
     },
-    async start(): Promise<void> {
-      const container = new LocalstackContainer(DEFAULT_LOCALSTACK_IMAGE);
-      startedContainer = await container.start();
-      const connectionUri = startedContainer.getConnectionUri();
+    async start(shared?: SharedConnection): Promise<void> {
       const region = resolvedOptions.region ?? 'us-east-1';
-      const s3Client = createS3Client(connectionUri, region, DEFAULT_CREDENTIALS);
-      const sqsClient = createSqsClient(connectionUri, region, DEFAULT_CREDENTIALS);
+      let connectionUri: string;
+      let credentials: AwsPresetCredentials;
+      if (shared) {
+        sharedConnection = shared;
+        connectionUri = shared.getConnectionUri();
+        credentials = shared.getCredentials();
+      } else {
+        const container = new LocalstackContainer(DEFAULT_LOCALSTACK_IMAGE);
+        startedContainer = await container.start();
+        connectionUri = startedContainer.getConnectionUri();
+        credentials = DEFAULT_CREDENTIALS;
+      }
+      const s3Client = createS3Client(connectionUri, shared?.getRegion() ?? region, credentials);
+      const sqsClient = createSqsClient(connectionUri, shared?.getRegion() ?? region, credentials);
 
       await s3Client.send(
         new CreateBucketCommand({ Bucket: resolvedOptions.bucketName })
@@ -159,8 +169,9 @@ export function createS3SqsPreset(options?: S3SqsPresetOptions): S3SqsPreset {
       if (startedContainer) {
         await startedContainer.stop();
         startedContainer = null;
-        bucketNameAfterStart = null;
       }
+      sharedConnection = null;
+      bucketNameAfterStart = null;
     },
     getBucketName(): string {
       if (!bucketNameAfterStart) {
@@ -169,12 +180,12 @@ export function createS3SqsPreset(options?: S3SqsPresetOptions): S3SqsPreset {
       return bucketNameAfterStart;
     },
     getConnectionUri(): string {
-      if (!startedContainer) {
-        throw new Error('Preset not started; call start() first');
-      }
-      return startedContainer.getConnectionUri();
+      if (startedContainer) return startedContainer.getConnectionUri();
+      if (sharedConnection) return sharedConnection.getConnectionUri();
+      throw new Error('Preset not started; call start() first');
     },
     getCredentials(): AwsPresetCredentials {
+      if (sharedConnection) return sharedConnection.getCredentials();
       return { ...DEFAULT_CREDENTIALS };
     },
     getConnectionConfig() {
