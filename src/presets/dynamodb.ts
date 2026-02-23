@@ -206,5 +206,12 @@ export function createDynamoDBPreset(options?: DynamoDBPresetOptions): DynamoDBP
     getCredentials(): AwsPresetCredentials {
       return { ...DEFAULT_CREDENTIALS };
     },
+    getConnectionConfig() {
+      return {
+        endpoint: this.getConnectionUri(),
+        credentials: this.getCredentials(),
+        region: resolvedOptions.region ?? 'us-east-1',
+      };
+    },
   };
 }

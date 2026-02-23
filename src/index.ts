@@ -21,6 +21,12 @@ export interface AwsPresetCredentials {
   secretAccessKey: string;
 }
 
+export interface AwsPresetConnectionConfig {
+  endpoint: string;
+  credentials: AwsPresetCredentials;
+  region: string;
+}
+
 export interface AwsPreset {
   /** Resolved options used to create this preset (read-only). */
   readonly options: AwsPresetOptions;
@@ -31,6 +37,7 @@ export interface AwsPreset {
 export interface LocalStackAwsPreset extends AwsPreset {
   getConnectionUri(): string;
   getCredentials(): AwsPresetCredentials;
+  getConnectionConfig(): AwsPresetConnectionConfig;
 }
 
 import { validateAwsPresetOptions } from './lib/validate-options.js';

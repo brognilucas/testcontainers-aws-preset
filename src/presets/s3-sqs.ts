@@ -177,5 +177,12 @@ export function createS3SqsPreset(options?: S3SqsPresetOptions): S3SqsPreset {
     getCredentials(): AwsPresetCredentials {
       return { ...DEFAULT_CREDENTIALS };
     },
+    getConnectionConfig() {
+      return {
+        endpoint: this.getConnectionUri(),
+        credentials: this.getCredentials(),
+        region: resolvedOptions.region ?? 'us-east-1',
+      };
+    },
   };
 }
