@@ -54,3 +54,5 @@ export function createAwsPreset(options?: AwsPresetOptions): AwsPreset {
 
 export { createSqsPreset } from './presets/sqs.js';
 export type { SqsPresetOptions } from './presets/sqs.js';
+export { createSnsSqsPreset } from './presets/sns-sqs.js';
+export type { SnsSqsPresetOptions, SnsSqsPreset } from './presets/sns-sqs.js';
