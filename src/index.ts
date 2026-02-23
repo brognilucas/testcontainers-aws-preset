@@ -23,12 +23,15 @@ export interface AwsPreset {
   stop(): Promise<void>;
 }
 
+import { validateAwsPresetOptions } from './lib/validate-options.js';
+
 /**
  * Creates an AWS preset with zero manual configuration.
  * @param options - Optional preset configuration. All properties are optional.
  * @returns An AWS preset instance; call start() then stop() for lifecycle.
  */
 export function createAwsPreset(options?: AwsPresetOptions): AwsPreset {
+  validateAwsPresetOptions(options);
   const resolvedOptions: AwsPresetOptions = Object.freeze({ ...(options ?? {}) });
   return {
     get options(): AwsPresetOptions {
