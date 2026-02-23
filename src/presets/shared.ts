@@ -44,6 +44,9 @@ export function createSharedPreset<T extends Record<string, LocalStackAwsPreset>
     getConnectionUri(): string {
       return firstPreset.getConnectionUri();
     },
+    getContainerId(): string {
+      return firstPreset.getContainerId();
+    },
     getCredentials(): AwsPresetCredentials {
       return firstPreset.getCredentials();
     },

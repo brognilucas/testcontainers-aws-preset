@@ -1,6 +1,7 @@
 import {
   CreateBucketCommand,
   PutBucketNotificationConfigurationCommand,
+  PutObjectCommand,
   S3Client,
 } from '@aws-sdk/client-s3';
 import {
@@ -21,6 +22,11 @@ const DEFAULT_CREDENTIALS: AwsPresetCredentials = {
   secretAccessKey: 'test',
 };
 
+export interface S3SeedObject {
+  key: string;
+  body: string;
+}
+
 export interface S3SqsPresetOptions extends AwsPresetOptions {
   /**
    * Name of the S3 bucket to create. Defaults to 'test-bucket'.
@@ -30,6 +36,10 @@ export interface S3SqsPresetOptions extends AwsPresetOptions {
    * Name of the SQS queue that receives S3 object-created notifications. Defaults to 'test-queue'.
    */
   queueName?: string;
+  /**
+   * Optional seed objects to put in the bucket after creation (key and body).
+   */
+  seedObjects?: S3SeedObject[];
 }
 
 export interface S3SqsPreset extends LocalStackAwsPreset {
@@ -47,6 +57,17 @@ function validateS3SqsPresetOptions(options: unknown): asserts options is S3SqsP
   if (opts !== undefined && 'queueName' in opts && opts.queueName !== undefined) {
     if (typeof opts.queueName !== 'string' || opts.queueName.trim() === '') {
       throw new Error(`queueName must be a non-empty string when provided, got: ${typeof opts.queueName}`);
+    }
+  }
+  if (opts !== undefined && 'seedObjects' in opts && opts.seedObjects !== undefined) {
+    if (!Array.isArray(opts.seedObjects)) {
+      throw new Error('seedObjects must be an array when provided');
+    }
+    for (let i = 0; i < opts.seedObjects.length; i++) {
+      const entry = opts.seedObjects[i];
+      if (typeof entry !== 'object' || entry === null || typeof entry.key !== 'string' || typeof entry.body !== 'string') {
+        throw new Error(`seedObjects[${i}] must be { key: string, body: string }`);
+      }
     }
   }
 }
@@ -95,6 +116,7 @@ export function createS3SqsPreset(options?: S3SqsPresetOptions): S3SqsPreset {
     ...(options ?? {}),
     bucketName: options?.bucketName?.trim() || DEFAULT_BUCKET_NAME,
     queueName: options?.queueName?.trim() || DEFAULT_QUEUE_NAME,
+    seedObjects: options?.seedObjects ?? [],
   });
 
   let startedContainer: Awaited<ReturnType<LocalstackContainer['start']>> | null = null;
@@ -164,6 +186,15 @@ export function createS3SqsPreset(options?: S3SqsPresetOptions): S3SqsPreset {
           },
         })
       );
+      for (const obj of resolvedOptions.seedObjects ?? []) {
+        await s3Client.send(
+          new PutObjectCommand({
+            Bucket: resolvedOptions.bucketName,
+            Key: obj.key,
+            Body: obj.body,
+          })
+        );
+      }
     },
     async stop(): Promise<void> {
       if (startedContainer) {
@@ -183,6 +214,12 @@ export function createS3SqsPreset(options?: S3SqsPresetOptions): S3SqsPreset {
       if (startedContainer) return startedContainer.getConnectionUri();
       if (sharedConnection) return sharedConnection.getConnectionUri();
       throw new Error('Preset not started; call start() first');
+    },
+    getContainerId(): string {
+      if (!startedContainer) {
+        throw new Error('Preset does not own a container; call start() without shared connection first');
+      }
+      return startedContainer.getId();
     },
     getCredentials(): AwsPresetCredentials {
       if (sharedConnection) return sharedConnection.getCredentials();

@@ -15,6 +15,7 @@ describe('SQS preset: pre-configured queue without manual LocalStack setup', () 
     expect(preset.options).toEqual({
       region: 'us-east-1',
       queueName: 'test-queue',
+      seedMessages: [],
     });
   });
 
@@ -47,5 +48,16 @@ describe('SQS preset: pre-configured queue without manual LocalStack setup', () 
     expect(() => createSqsPreset({ queueName: 123 as unknown as string })).toThrow(
       /queueName must be a non-empty string when provided/
     );
+  });
+
+  it('accepts seedMessages in options', () => {
+    const preset = createSqsPreset({ seedMessages: ['msg1', 'msg2'] });
+    expect(preset.options.seedMessages).toEqual(['msg1', 'msg2']);
+  });
+
+  it('throws when seedMessages is not an array', () => {
+    expect(() =>
+      createSqsPreset({ seedMessages: 'not-array' as unknown as string[] })
+    ).toThrow('seedMessages must be an array when provided');
   });
 });

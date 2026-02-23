@@ -16,6 +16,7 @@ describe('S3 + SQS preset: file upload triggers and downstream queue', () => {
       region: 'us-east-1',
       bucketName: 'test-bucket',
       queueName: 'test-queue',
+      seedObjects: [],
     });
   });
 
@@ -51,5 +52,19 @@ describe('S3 + SQS preset: file upload triggers and downstream queue', () => {
     expect(() => createS3SqsPreset({ queueName: '' })).toThrow(
       /queueName must be a non-empty string when provided/
     );
+  });
+
+  it('accepts seedObjects in options', () => {
+    const preset = createS3SqsPreset({
+      seedObjects: [{ key: 'a.txt', body: 'hello' }],
+    });
+    expect(preset.options.seedObjects).toHaveLength(1);
+    expect(preset.options.seedObjects![0]).toEqual({ key: 'a.txt', body: 'hello' });
+  });
+
+  it('throws when seedObjects is not an array', () => {
+    expect(() =>
+      createS3SqsPreset({ seedObjects: 'not-array' as unknown as { key: string; body: string }[] })
+    ).toThrow('seedObjects must be an array when provided');
   });
 });

@@ -1,4 +1,4 @@
-import { CreateTopicCommand, SNSClient, SubscribeCommand } from '@aws-sdk/client-sns';
+import { CreateTopicCommand, PublishCommand, SNSClient, SubscribeCommand } from '@aws-sdk/client-sns';
 import {
   CreateQueueCommand,
   GetQueueAttributesCommand,
@@ -26,6 +26,10 @@ export interface SnsSqsPresetOptions extends AwsPresetOptions {
    * Name of the SQS queue to create and subscribe to the topic. Defaults to 'test-queue'.
    */
   queueName?: string;
+  /**
+   * Optional seed messages to publish to the topic after setup (delivered to subscribed queue).
+   */
+  seedMessages?: string[];
 }
 
 export interface SnsSqsPreset extends LocalStackAwsPreset {
@@ -43,6 +47,16 @@ function validateSnsSqsPresetOptions(options: unknown): asserts options is SnsSq
   if (opts !== undefined && 'queueName' in opts && opts.queueName !== undefined) {
     if (typeof opts.queueName !== 'string' || opts.queueName.trim() === '') {
       throw new Error(`queueName must be a non-empty string when provided, got: ${typeof opts.queueName}`);
+    }
+  }
+  if (opts !== undefined && 'seedMessages' in opts && opts.seedMessages !== undefined) {
+    if (!Array.isArray(opts.seedMessages)) {
+      throw new Error('seedMessages must be an array when provided');
+    }
+    for (let i = 0; i < opts.seedMessages.length; i++) {
+      if (typeof opts.seedMessages[i] !== 'string') {
+        throw new Error(`seedMessages[${i}] must be a string`);
+      }
     }
   }
 }
@@ -85,6 +99,7 @@ export function createSnsSqsPreset(options?: SnsSqsPresetOptions): SnsSqsPreset 
     ...(options ?? {}),
     topicName: options?.topicName?.trim() || DEFAULT_TOPIC_NAME,
     queueName: options?.queueName?.trim() || DEFAULT_QUEUE_NAME,
+    seedMessages: options?.seedMessages ?? [],
   });
 
   let startedContainer: Awaited<ReturnType<LocalstackContainer['start']>> | null = null;
@@ -149,6 +164,11 @@ export function createSnsSqsPreset(options?: SnsSqsPresetOptions): SnsSqsPreset 
           Endpoint: queueArn,
         })
       );
+      for (const message of resolvedOptions.seedMessages ?? []) {
+        await snsClient.send(
+          new PublishCommand({ TopicArn: topicArn, Message: message })
+        );
+      }
     },
     async stop(): Promise<void> {
       if (startedContainer) {
@@ -168,6 +188,12 @@ export function createSnsSqsPreset(options?: SnsSqsPresetOptions): SnsSqsPreset 
       if (startedContainer) return startedContainer.getConnectionUri();
       if (sharedConnection) return sharedConnection.getConnectionUri();
       throw new Error('Preset not started; call start() first');
+    },
+    getContainerId(): string {
+      if (!startedContainer) {
+        throw new Error('Preset does not own a container; call start() without shared connection first');
+      }
+      return startedContainer.getId();
     },
     getCredentials(): AwsPresetCredentials {
       if (sharedConnection) return sharedConnection.getCredentials();

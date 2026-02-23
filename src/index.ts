@@ -44,6 +44,7 @@ export interface LocalStackAwsPreset extends AwsPreset {
   getConnectionUri(): string;
   getCredentials(): AwsPresetCredentials;
   getConnectionConfig(): AwsPresetConnectionConfig;
+  getContainerId(): string;
   start(sharedConnection?: SharedConnection): Promise<void>;
 }
 
@@ -74,6 +75,7 @@ export { createEventBridgeSqsPreset } from './presets/eventbridge-sqs.js';
 export type {
   EventBridgeSqsPresetOptions,
   EventBridgeSqsPreset,
+  EventBridgeSeedEvent,
 } from './presets/eventbridge-sqs.js';
 export { createDynamoDBPreset } from './presets/dynamodb.js';
 export type {
@@ -83,7 +85,7 @@ export type {
   DynamoDBKeyType,
 } from './presets/dynamodb.js';
 export { createS3SqsPreset } from './presets/s3-sqs.js';
-export type { S3SqsPresetOptions, S3SqsPreset } from './presets/s3-sqs.js';
+export type { S3SqsPresetOptions, S3SqsPreset, S3SeedObject } from './presets/s3-sqs.js';
 export { createSecretsManagerPreset } from './presets/secrets-manager.js';
 export type {
   SecretsManagerPresetOptions,

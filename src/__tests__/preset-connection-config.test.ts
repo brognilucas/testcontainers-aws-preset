@@ -9,7 +9,7 @@ import {
 } from '../index';
 
 describe('Preset resolved endpoint and credentials for SDK clients', () => {
-  it('each LocalStack preset exposes getConnectionConfig returning endpoint, credentials, and region', () => {
+  it('each LocalStack preset exposes getConnectionConfig and getContainerId', () => {
     const factories = [
       createSqsPreset,
       createSnsSqsPreset,
@@ -21,7 +21,9 @@ describe('Preset resolved endpoint and credentials for SDK clients', () => {
     for (const create of factories) {
       const preset = create();
       expect(typeof preset.getConnectionConfig).toBe('function');
+      expect(typeof preset.getContainerId).toBe('function');
       expect(() => preset.getConnectionConfig()).toThrow('Preset not started; call start() first');
+      expect(() => preset.getContainerId()).toThrow(/Preset does not own a container|Preset not started/);
     }
   });
 

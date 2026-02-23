@@ -1,5 +1,6 @@
 import {
   EventBridgeClient,
+  PutEventsCommand,
   PutRuleCommand,
   PutTargetsCommand,
 } from '@aws-sdk/client-eventbridge';
@@ -22,6 +23,12 @@ const DEFAULT_CREDENTIALS: AwsPresetCredentials = {
   secretAccessKey: 'test',
 };
 
+export interface EventBridgeSeedEvent {
+  source?: string;
+  detailType?: string;
+  detail?: string | Record<string, unknown>;
+}
+
 export interface EventBridgeSqsPresetOptions extends AwsPresetOptions {
   /**
    * Name of the EventBridge rule to create. Defaults to 'test-rule'.
@@ -31,6 +38,10 @@ export interface EventBridgeSqsPresetOptions extends AwsPresetOptions {
    * Name of the SQS queue to create and use as target. Defaults to 'test-queue'.
    */
   queueName?: string;
+  /**
+   * Optional seed events to put on the default event bus (source defaults to 'test' to match rule).
+   */
+  seedEvents?: EventBridgeSeedEvent[];
 }
 
 export interface EventBridgeSqsPreset extends LocalStackAwsPreset {
@@ -50,6 +61,11 @@ function validateEventBridgeSqsPresetOptions(
   if (opts !== undefined && 'queueName' in opts && opts.queueName !== undefined) {
     if (typeof opts.queueName !== 'string' || opts.queueName.trim() === '') {
       throw new Error(`queueName must be a non-empty string when provided, got: ${typeof opts.queueName}`);
+    }
+  }
+  if (opts !== undefined && 'seedEvents' in opts && opts.seedEvents !== undefined) {
+    if (!Array.isArray(opts.seedEvents)) {
+      throw new Error('seedEvents must be an array when provided');
     }
   }
 }
@@ -94,6 +110,7 @@ export function createEventBridgeSqsPreset(
     ...(options ?? {}),
     ruleName: options?.ruleName?.trim() || DEFAULT_RULE_NAME,
     queueName: options?.queueName?.trim() || DEFAULT_QUEUE_NAME,
+    seedEvents: options?.seedEvents ?? [],
   });
 
   let startedContainer: Awaited<ReturnType<LocalstackContainer['start']>> | null = null;
@@ -166,6 +183,19 @@ export function createEventBridgeSqsPreset(
           Targets: [{ Id: 'sqs', Arn: queueArn }],
         })
       );
+      const seedEvents = resolvedOptions.seedEvents ?? [];
+      if (seedEvents.length > 0) {
+        await eventBridgeClient.send(
+          new PutEventsCommand({
+            Entries: seedEvents.map((event) => ({
+              Source: event.source ?? 'test',
+              DetailType: event.detailType,
+              Detail: typeof event.detail === 'string' ? event.detail : JSON.stringify(event.detail ?? {}),
+              EventBusName: DEFAULT_EVENT_BUS_NAME,
+            })),
+          })
+        );
+      }
     },
     async stop(): Promise<void> {
       if (startedContainer) {
@@ -185,6 +215,12 @@ export function createEventBridgeSqsPreset(
       if (startedContainer) return startedContainer.getConnectionUri();
       if (sharedConnection) return sharedConnection.getConnectionUri();
       throw new Error('Preset not started; call start() first');
+    },
+    getContainerId(): string {
+      if (!startedContainer) {
+        throw new Error('Preset does not own a container; call start() without shared connection first');
+      }
+      return startedContainer.getId();
     },
     getCredentials(): AwsPresetCredentials {
       if (sharedConnection) return sharedConnection.getCredentials();

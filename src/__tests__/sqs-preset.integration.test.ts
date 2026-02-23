@@ -48,4 +48,33 @@ describeIntegration('SQS preset against live LocalStack', () => {
       await preset.stop();
     }
   }, 120_000);
+
+  it('queue starts with seed messages so receive returns them', async () => {
+    const preset = createSqsPreset({
+      queueName: 'integration-seed-queue',
+      seedMessages: ['seed-one', 'seed-two'],
+    });
+    await preset.start();
+    try {
+      const client = new SQSClient(preset.getConnectionConfig());
+      const getQueueUrlResponse = await client.send(
+        new GetQueueUrlCommand({ QueueName: 'integration-seed-queue' })
+      );
+      const queueUrl = getQueueUrlResponse.QueueUrl;
+      expect(queueUrl).toBeDefined();
+      const receiveResponse = await client.send(
+        new ReceiveMessageCommand({
+          QueueUrl: queueUrl!,
+          MaxNumberOfMessages: 10,
+          WaitTimeSeconds: 2,
+        })
+      );
+      const bodies = (receiveResponse.Messages ?? []).map((m) => m.Body).filter(Boolean);
+      expect(bodies).toContain('seed-one');
+      expect(bodies).toContain('seed-two');
+      expect(bodies.length).toBe(2);
+    } finally {
+      await preset.stop();
+    }
+  }, 60_000);
 });

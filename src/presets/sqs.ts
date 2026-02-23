@@ -1,4 +1,4 @@
-import { CreateQueueCommand, SQSClient } from '@aws-sdk/client-sqs';
+import { CreateQueueCommand, SendMessageCommand, SQSClient } from '@aws-sdk/client-sqs';
 import { LocalstackContainer } from '@testcontainers/localstack';
 import type { AwsPresetCredentials, AwsPresetOptions, LocalStackAwsPreset, SharedConnection } from '../index.js';
 import { validateAwsPresetOptions } from '../lib/validate-options.js';
@@ -16,6 +16,10 @@ export interface SqsPresetOptions extends AwsPresetOptions {
    * @example 'my-queue'
    */
   queueName?: string;
+  /**
+   * Optional seed messages to send to the queue after creation.
+   */
+  seedMessages?: string[];
 }
 
 function validateSqsPresetOptions(options: unknown): asserts options is SqsPresetOptions {
@@ -24,6 +28,16 @@ function validateSqsPresetOptions(options: unknown): asserts options is SqsPrese
   if (opts !== undefined && 'queueName' in opts && opts.queueName !== undefined) {
     if (typeof opts.queueName !== 'string' || opts.queueName.trim() === '') {
       throw new Error(`queueName must be a non-empty string when provided, got: ${typeof opts.queueName}`);
+    }
+  }
+  if (opts !== undefined && 'seedMessages' in opts && opts.seedMessages !== undefined) {
+    if (!Array.isArray(opts.seedMessages)) {
+      throw new Error('seedMessages must be an array when provided');
+    }
+    for (let i = 0; i < opts.seedMessages.length; i++) {
+      if (typeof opts.seedMessages[i] !== 'string') {
+        throw new Error(`seedMessages[${i}] must be a string`);
+      }
     }
   }
 }
@@ -46,6 +60,7 @@ export function createSqsPreset(options?: SqsPresetOptions): LocalStackAwsPreset
     region: 'us-east-1',
     ...(options ?? {}),
     queueName: options?.queueName?.trim() || DEFAULT_QUEUE_NAME,
+    seedMessages: options?.seedMessages ?? [],
   });
 
   let startedContainer: Awaited<ReturnType<LocalstackContainer['start']>> | null = null;
@@ -57,22 +72,31 @@ export function createSqsPreset(options?: SqsPresetOptions): LocalStackAwsPreset
     },
     async start(shared?: SharedConnection): Promise<void> {
       const region = resolvedOptions.region ?? 'us-east-1';
+      let connectionUri: string;
+      let credentials: AwsPresetCredentials;
       if (shared) {
         sharedConnection = shared;
-        const connectionUri = shared.getConnectionUri();
-        const client = createSqsClient(connectionUri, shared.getRegion(), shared.getCredentials());
-        await client.send(
-          new CreateQueueCommand({ QueueName: resolvedOptions.queueName })
-        );
-        return;
+        connectionUri = shared.getConnectionUri();
+        credentials = shared.getCredentials();
+      } else {
+        const container = new LocalstackContainer(DEFAULT_LOCALSTACK_IMAGE);
+        startedContainer = await container.start();
+        connectionUri = startedContainer.getConnectionUri();
+        credentials = DEFAULT_CREDENTIALS;
       }
-      const container = new LocalstackContainer(DEFAULT_LOCALSTACK_IMAGE);
-      startedContainer = await container.start();
-      const connectionUri = startedContainer.getConnectionUri();
-      const client = createSqsClient(connectionUri, region, DEFAULT_CREDENTIALS);
-      await client.send(
+      const client = createSqsClient(
+        connectionUri,
+        shared?.getRegion() ?? region,
+        credentials
+      );
+      const createResponse = await client.send(
         new CreateQueueCommand({ QueueName: resolvedOptions.queueName })
       );
+      const queueUrl = createResponse.QueueUrl;
+      if (!queueUrl) throw new Error('CreateQueue did not return QueueUrl');
+      for (const body of resolvedOptions.seedMessages ?? []) {
+        await client.send(new SendMessageCommand({ QueueUrl: queueUrl, MessageBody: body }));
+      }
     },
     async stop(): Promise<void> {
       if (startedContainer) {
@@ -85,6 +109,12 @@ export function createSqsPreset(options?: SqsPresetOptions): LocalStackAwsPreset
       if (startedContainer) return startedContainer.getConnectionUri();
       if (sharedConnection) return sharedConnection.getConnectionUri();
       throw new Error('Preset not started; call start() first');
+    },
+    getContainerId(): string {
+      if (!startedContainer) {
+        throw new Error('Preset does not own a container; call start() without shared connection first');
+      }
+      return startedContainer.getId();
     },
     getCredentials(): AwsPresetCredentials {
       if (sharedConnection) return sharedConnection.getCredentials();

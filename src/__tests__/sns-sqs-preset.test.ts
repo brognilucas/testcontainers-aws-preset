@@ -16,6 +16,7 @@ describe('SNS + SQS preset: pub/sub with subscription wired', () => {
       region: 'us-east-1',
       topicName: 'test-topic',
       queueName: 'test-queue',
+      seedMessages: [],
     });
   });
 
@@ -53,5 +54,16 @@ describe('SNS + SQS preset: pub/sub with subscription wired', () => {
     expect(() => createSnsSqsPreset({ queueName: '' })).toThrow(
       /queueName must be a non-empty string when provided/
     );
+  });
+
+  it('accepts seedMessages in options', () => {
+    const preset = createSnsSqsPreset({ seedMessages: ['event1'] });
+    expect(preset.options.seedMessages).toEqual(['event1']);
+  });
+
+  it('throws when seedMessages is not an array', () => {
+    expect(() =>
+      createSnsSqsPreset({ seedMessages: 'not-array' as unknown as string[] })
+    ).toThrow('seedMessages must be an array when provided');
   });
 });

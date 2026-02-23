@@ -9,6 +9,11 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js",
       "require": "./dist/index.js"
+    },
+    "./jest": {
+      "types": "./dist/jest/global-setup-teardown.d.ts",
+      "import": "./dist/jest/global-setup-teardown.js",
+      "require": "./dist/jest/global-setup-teardown.js"
     }
   },
   "scripts": {

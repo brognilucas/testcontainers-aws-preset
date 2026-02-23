@@ -20,6 +20,7 @@ describe('EventBridge + SQS preset: event-driven workflow with rule and target',
       region: 'us-east-1',
       ruleName: 'test-rule',
       queueName: 'test-queue',
+      seedEvents: [],
     });
   });
 
@@ -55,5 +56,21 @@ describe('EventBridge + SQS preset: event-driven workflow with rule and target',
     expect(() => createEventBridgeSqsPreset({ queueName: '' })).toThrow(
       /queueName must be a non-empty string when provided/
     );
+  });
+
+  it('accepts seedEvents in options', () => {
+    const preset = createEventBridgeSqsPreset({
+      seedEvents: [{ source: 'test', detail: { id: 1 } }],
+    });
+    expect(preset.options.seedEvents).toHaveLength(1);
+    expect(preset.options.seedEvents![0].source).toBe('test');
+  });
+
+  it('throws when seedEvents is not an array', () => {
+    expect(() =>
+      createEventBridgeSqsPreset({
+        seedEvents: 'not-array' as unknown as { source?: string; detail?: Record<string, unknown> }[],
+      })
+    ).toThrow('seedEvents must be an array when provided');
   });
 });

@@ -113,6 +113,12 @@ export function createSecretsManagerPreset(
       if (sharedConnection) return sharedConnection.getConnectionUri();
       throw new Error('Preset not started; call start() first');
     },
+    getContainerId(): string {
+      if (!startedContainer) {
+        throw new Error('Preset does not own a container; call start() without shared connection first');
+      }
+      return startedContainer.getId();
+    },
     getCredentials(): AwsPresetCredentials {
       if (sharedConnection) return sharedConnection.getCredentials();
       return { ...DEFAULT_CREDENTIALS };
