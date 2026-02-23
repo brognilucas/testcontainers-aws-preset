@@ -1,0 +1,33 @@
+{
+  "name": "testcontainers-aws-preset",
+  "version": "0.1.0",
+  "description": "Testcontainers preset for AWS services",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "clean": "rm -rf dist",
+    "test": "jest",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": ["testcontainers", "aws", "testing"],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/jest": "^29.5.14",
+    "jest": "^29.7.0",
+    "ts-jest": "^29.2.5",
+    "typescript": "^5.6.3"
+  },
+  "files": ["dist"],
+  "engines": {
+    "node": ">=18"
+  }
+}
