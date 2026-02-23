@@ -16,11 +16,21 @@ export interface AwsPresetOptions {
   region?: string;
 }
 
+export interface AwsPresetCredentials {
+  accessKeyId: string;
+  secretAccessKey: string;
+}
+
 export interface AwsPreset {
   /** Resolved options used to create this preset (read-only). */
   readonly options: AwsPresetOptions;
   start(): Promise<void>;
   stop(): Promise<void>;
+}
+
+export interface LocalStackAwsPreset extends AwsPreset {
+  getConnectionUri(): string;
+  getCredentials(): AwsPresetCredentials;
 }
 
 import { validateAwsPresetOptions } from './lib/validate-options.js';
@@ -41,3 +51,6 @@ export function createAwsPreset(options?: AwsPresetOptions): AwsPreset {
     async stop(): Promise<void> {},
   };
 }
+
+export { createSqsPreset } from './presets/sqs.js';
+export type { SqsPresetOptions } from './presets/sqs.js';
