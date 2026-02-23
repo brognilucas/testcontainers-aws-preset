@@ -61,3 +61,10 @@ export type {
   EventBridgeSqsPresetOptions,
   EventBridgeSqsPreset,
 } from './presets/eventbridge-sqs.js';
+export { createDynamoDBPreset } from './presets/dynamodb.js';
+export type {
+  DynamoDBPresetOptions,
+  DynamoDBPreset,
+  DynamoDBKeySchema,
+  DynamoDBKeyType,
+} from './presets/dynamodb.js';
