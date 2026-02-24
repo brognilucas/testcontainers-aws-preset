@@ -6,6 +6,8 @@ This project follows [Semantic Versioning](https://semver.org/): **MAJOR.MINOR.P
 
 ## [0.1.0] - 2025-02-24
 
+Initial release.
+
 ### Added
 
 - Presets for AWS services (LocalStack): SQS, DynamoDB, S3-SQS, SNS-SQS, EventBridge-SQS, Secrets Manager.
@@ -16,6 +18,7 @@ This project follows [Semantic Versioning](https://semver.org/): **MAJOR.MINOR.P
 - Optional Jest `globalSetup`/`globalTeardown` for shared container lifecycle.
 - README with getting started and Todo API example (DynamoDB + SQS).
 - CONTRIBUTING guide and preset template for adding new AWS services.
+- CHANGELOG and semantic versioning (SemVer); versioning documented in README and CONTRIBUTING.
 - TypeScript types for all preset options; configuration validation at preset creation.
 
 [Unreleased]: https://github.com/your-org/testcontainers-aws-preset/compare/v0.1.0...HEAD
