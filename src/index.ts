@@ -46,6 +46,7 @@ export interface LocalStackAwsPreset extends AwsPreset {
   getConnectionConfig(): AwsPresetConnectionConfig;
   getContainerId(): string;
   start(sharedConnection?: SharedConnection): Promise<void>;
+  reset(): Promise<void>;
 }
 
 import { validateAwsPresetOptions } from './lib/validate-options.js';

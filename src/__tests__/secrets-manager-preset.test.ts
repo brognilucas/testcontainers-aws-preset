@@ -6,6 +6,7 @@ describe('Secrets Manager preset: pre-configured secrets without mocking AWS SDK
     expect(preset).toBeDefined();
     expect(typeof preset.start).toBe('function');
     expect(typeof preset.stop).toBe('function');
+    expect(typeof preset.reset).toBe('function');
     expect(typeof preset.getConnectionUri).toBe('function');
     expect(typeof preset.getCredentials).toBe('function');
     expect(preset.options).toEqual({

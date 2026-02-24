@@ -1,4 +1,8 @@
-import { CreateSecretCommand, SecretsManagerClient } from '@aws-sdk/client-secrets-manager';
+import {
+  CreateSecretCommand,
+  DeleteSecretCommand,
+  SecretsManagerClient,
+} from '@aws-sdk/client-secrets-manager';
 import { LocalstackContainer } from '@testcontainers/localstack';
 import type { AwsPresetCredentials, AwsPresetOptions, LocalStackAwsPreset, SharedConnection } from '../index.js';
 import { validateAwsPresetOptions } from '../lib/validate-options.js';
@@ -93,6 +97,37 @@ export function createSecretsManagerPreset(
         credentials
       );
       for (const seed of resolvedOptions.seedSecrets ?? []) {
+        await client.send(
+          new CreateSecretCommand({
+            Name: seed.name,
+            SecretString: seed.secretString,
+          })
+        );
+      }
+    },
+    async reset(): Promise<void> {
+      const connectionUri = startedContainer
+        ? startedContainer.getConnectionUri()
+        : sharedConnection?.getConnectionUri();
+      if (!connectionUri) {
+        throw new Error('Preset not started; call start() first');
+      }
+      const region = sharedConnection?.getRegion() ?? resolvedOptions.region ?? 'us-east-1';
+      const credentials = sharedConnection
+        ? sharedConnection.getCredentials()
+        : { ...DEFAULT_CREDENTIALS };
+      const client = createSecretsManagerClient(connectionUri, region, credentials);
+      for (const seed of resolvedOptions.seedSecrets ?? []) {
+        try {
+          await client.send(
+            new DeleteSecretCommand({
+              SecretId: seed.name,
+              ForceDeleteWithoutRecovery: true,
+            })
+          );
+        } catch (error: unknown) {
+          if ((error as { name?: string }).name !== 'ResourceNotFoundException') throw error;
+        }
         await client.send(
           new CreateSecretCommand({
             Name: seed.name,

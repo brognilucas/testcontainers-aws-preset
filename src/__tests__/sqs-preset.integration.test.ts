@@ -77,4 +77,37 @@ describeIntegration('SQS preset against live LocalStack', () => {
       await preset.stop();
     }
   }, 60_000);
+
+  it('reset restores queue to initial seed state after messages are added or consumed', async () => {
+    const preset = createSqsPreset({
+      queueName: 'integration-reset-queue',
+      seedMessages: ['seed-a', 'seed-b'],
+    });
+    await preset.start();
+    try {
+      const client = new SQSClient(preset.getConnectionConfig());
+      const getQueueUrlResponse = await client.send(
+        new GetQueueUrlCommand({ QueueName: 'integration-reset-queue' })
+      );
+      const queueUrl = getQueueUrlResponse.QueueUrl!;
+      await client.send(
+        new SendMessageCommand({ QueueUrl: queueUrl, MessageBody: 'extra-message' })
+      );
+      await preset.reset();
+      const receiveResponse = await client.send(
+        new ReceiveMessageCommand({
+          QueueUrl: queueUrl,
+          MaxNumberOfMessages: 10,
+          WaitTimeSeconds: 2,
+        })
+      );
+      const bodies = (receiveResponse.Messages ?? []).map((m) => m.Body).filter(Boolean);
+      expect(bodies).toContain('seed-a');
+      expect(bodies).toContain('seed-b');
+      expect(bodies).not.toContain('extra-message');
+      expect(bodies.length).toBe(2);
+    } finally {
+      await preset.stop();
+    }
+  }, 60_000);
 });

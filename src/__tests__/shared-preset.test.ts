@@ -11,13 +11,14 @@ describe('Shared preset: single container for multiple presets', () => {
     );
   });
 
-  it('exposes start, stop, getConnectionUri, getCredentials, getConnectionConfig, and presets', () => {
+  it('exposes start, stop, reset, getConnectionUri, getCredentials, getConnectionConfig, and presets', () => {
     const shared = createSharedPreset({
       sqs: createSqsPreset(),
       dynamodb: createDynamoDBPreset(),
     });
     expect(typeof shared.start).toBe('function');
     expect(typeof shared.stop).toBe('function');
+    expect(typeof shared.reset).toBe('function');
     expect(typeof shared.getConnectionUri).toBe('function');
     expect(typeof shared.getCredentials).toBe('function');
     expect(typeof shared.getConnectionConfig).toBe('function');

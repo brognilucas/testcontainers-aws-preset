@@ -7,6 +7,7 @@ import {
 import {
   CreateQueueCommand,
   GetQueueAttributesCommand,
+  PurgeQueueCommand,
   SetQueueAttributesCommand,
   SQSClient,
 } from '@aws-sdk/client-sqs';
@@ -116,6 +117,7 @@ export function createEventBridgeSqsPreset(
   let startedContainer: Awaited<ReturnType<LocalstackContainer['start']>> | null = null;
   let sharedConnection: SharedConnection | null = null;
   let ruleNameAfterStart: string | null = null;
+  let queueUrlAfterStart: string | null = null;
 
   return {
     get options(): EventBridgeSqsPresetOptions {
@@ -147,6 +149,7 @@ export function createEventBridgeSqsPreset(
       );
       const queueUrl = createQueueResponse.QueueUrl;
       if (!queueUrl) throw new Error('CreateQueue did not return QueueUrl');
+      queueUrlAfterStart = queueUrl;
 
       const putRuleResponse = await eventBridgeClient.send(
         new PutRuleCommand({
@@ -197,6 +200,34 @@ export function createEventBridgeSqsPreset(
         );
       }
     },
+    async reset(): Promise<void> {
+      if (!queueUrlAfterStart) {
+        throw new Error('Preset not started; call start() first');
+      }
+      const region = sharedConnection?.getRegion() ?? resolvedOptions.region ?? 'us-east-1';
+      const credentials = sharedConnection
+        ? sharedConnection.getCredentials()
+        : { ...DEFAULT_CREDENTIALS };
+      const connectionUri = startedContainer
+        ? startedContainer.getConnectionUri()
+        : sharedConnection!.getConnectionUri();
+      const sqsClient = createSqsClient(connectionUri, region, credentials);
+      const eventBridgeClient = createEventBridgeClient(connectionUri, region, credentials);
+      await sqsClient.send(new PurgeQueueCommand({ QueueUrl: queueUrlAfterStart }));
+      const seedEvents = resolvedOptions.seedEvents ?? [];
+      if (seedEvents.length > 0) {
+        await eventBridgeClient.send(
+          new PutEventsCommand({
+            Entries: seedEvents.map((event) => ({
+              Source: event.source ?? 'test',
+              DetailType: event.detailType,
+              Detail: typeof event.detail === 'string' ? event.detail : JSON.stringify(event.detail ?? {}),
+              EventBusName: DEFAULT_EVENT_BUS_NAME,
+            })),
+          })
+        );
+      }
+    },
     async stop(): Promise<void> {
       if (startedContainer) {
         await startedContainer.stop();
@@ -204,6 +235,7 @@ export function createEventBridgeSqsPreset(
       }
       sharedConnection = null;
       ruleNameAfterStart = null;
+      queueUrlAfterStart = null;
     },
     getRuleName(): string {
       if (!ruleNameAfterStart) {

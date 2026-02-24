@@ -1,4 +1,9 @@
-import { CreateQueueCommand, SendMessageCommand, SQSClient } from '@aws-sdk/client-sqs';
+import {
+  CreateQueueCommand,
+  PurgeQueueCommand,
+  SendMessageCommand,
+  SQSClient,
+} from '@aws-sdk/client-sqs';
 import { LocalstackContainer } from '@testcontainers/localstack';
 import type { AwsPresetCredentials, AwsPresetOptions, LocalStackAwsPreset, SharedConnection } from '../index.js';
 import { validateAwsPresetOptions } from '../lib/validate-options.js';
@@ -65,6 +70,7 @@ export function createSqsPreset(options?: SqsPresetOptions): LocalStackAwsPreset
 
   let startedContainer: Awaited<ReturnType<LocalstackContainer['start']>> | null = null;
   let sharedConnection: SharedConnection | null = null;
+  let queueUrlAfterStart: string | null = null;
 
   return {
     get options(): SqsPresetOptions {
@@ -94,8 +100,28 @@ export function createSqsPreset(options?: SqsPresetOptions): LocalStackAwsPreset
       );
       const queueUrl = createResponse.QueueUrl;
       if (!queueUrl) throw new Error('CreateQueue did not return QueueUrl');
+      queueUrlAfterStart = queueUrl;
       for (const body of resolvedOptions.seedMessages ?? []) {
         await client.send(new SendMessageCommand({ QueueUrl: queueUrl, MessageBody: body }));
+      }
+    },
+    async reset(): Promise<void> {
+      if (!queueUrlAfterStart) {
+        throw new Error('Preset not started; call start() first');
+      }
+      const connectionUri = startedContainer
+        ? startedContainer.getConnectionUri()
+        : sharedConnection!.getConnectionUri();
+      const credentials = sharedConnection
+        ? sharedConnection.getCredentials()
+        : { ...DEFAULT_CREDENTIALS };
+      const region = sharedConnection?.getRegion() ?? resolvedOptions.region ?? 'us-east-1';
+      const client = createSqsClient(connectionUri, region, credentials);
+      await client.send(new PurgeQueueCommand({ QueueUrl: queueUrlAfterStart }));
+      for (const body of resolvedOptions.seedMessages ?? []) {
+        await client.send(
+          new SendMessageCommand({ QueueUrl: queueUrlAfterStart, MessageBody: body })
+        );
       }
     },
     async stop(): Promise<void> {
@@ -104,6 +130,7 @@ export function createSqsPreset(options?: SqsPresetOptions): LocalStackAwsPreset
         startedContainer = null;
       }
       sharedConnection = null;
+      queueUrlAfterStart = null;
     },
     getConnectionUri(): string {
       if (startedContainer) return startedContainer.getConnectionUri();

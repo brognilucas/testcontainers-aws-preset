@@ -13,6 +13,7 @@ describe('DynamoDB preset: table with optional seed data', () => {
     expect(preset).toBeDefined();
     expect(typeof preset.start).toBe('function');
     expect(typeof preset.stop).toBe('function');
+    expect(typeof preset.reset).toBe('function');
     expect(typeof preset.getConnectionUri).toBe('function');
     expect(typeof preset.getCredentials).toBe('function');
     expect(typeof preset.getTableName).toBe('function');

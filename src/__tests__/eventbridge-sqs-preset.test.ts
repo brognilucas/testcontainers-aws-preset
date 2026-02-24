@@ -13,6 +13,7 @@ describe('EventBridge + SQS preset: event-driven workflow with rule and target',
     expect(preset).toBeDefined();
     expect(typeof preset.start).toBe('function');
     expect(typeof preset.stop).toBe('function');
+    expect(typeof preset.reset).toBe('function');
     expect(typeof preset.getConnectionUri).toBe('function');
     expect(typeof preset.getCredentials).toBe('function');
     expect(typeof preset.getRuleName).toBe('function');

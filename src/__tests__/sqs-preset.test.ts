@@ -5,11 +5,12 @@
 import { createSqsPreset, type SqsPresetOptions } from '../index';
 
 describe('SQS preset: pre-configured queue without manual LocalStack setup', () => {
-  it('should return a LocalStack preset with start, stop, getConnectionUri, getCredentials, and options', () => {
+  it('should return a LocalStack preset with start, stop, reset, getConnectionUri, getCredentials, and options', () => {
     const preset = createSqsPreset();
     expect(preset).toBeDefined();
     expect(typeof preset.start).toBe('function');
     expect(typeof preset.stop).toBe('function');
+    expect(typeof preset.reset).toBe('function');
     expect(typeof preset.getConnectionUri).toBe('function');
     expect(typeof preset.getCredentials).toBe('function');
     expect(preset.options).toEqual({
@@ -36,6 +37,11 @@ describe('SQS preset: pre-configured queue without manual LocalStack setup', () 
   it('should throw when getConnectionUri is called before start', () => {
     const preset = createSqsPreset();
     expect(() => preset.getConnectionUri()).toThrow('Preset not started; call start() first');
+  });
+
+  it('should throw when reset is called before start', async () => {
+    const preset = createSqsPreset();
+    await expect(preset.reset()).rejects.toThrow('Preset not started; call start() first');
   });
 
   it('should throw when queueName is empty string', () => {

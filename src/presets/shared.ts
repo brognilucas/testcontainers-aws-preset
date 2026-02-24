@@ -41,6 +41,11 @@ export function createSharedPreset<T extends Record<string, LocalStackAwsPreset>
     async stop(): Promise<void> {
       await firstPreset.stop();
     },
+    async reset(): Promise<void> {
+      for (const [, preset] of entries) {
+        await preset.reset();
+      }
+    },
     getConnectionUri(): string {
       return firstPreset.getConnectionUri();
     },

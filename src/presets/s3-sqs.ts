@@ -1,5 +1,7 @@
 import {
   CreateBucketCommand,
+  DeleteObjectsCommand,
+  ListObjectsV2Command,
   PutBucketNotificationConfigurationCommand,
   PutObjectCommand,
   S3Client,
@@ -7,6 +9,8 @@ import {
 import {
   CreateQueueCommand,
   GetQueueAttributesCommand,
+  GetQueueUrlCommand,
+  PurgeQueueCommand,
   SetQueueAttributesCommand,
   SQSClient,
 } from '@aws-sdk/client-sqs';
@@ -190,6 +194,61 @@ export function createS3SqsPreset(options?: S3SqsPresetOptions): S3SqsPreset {
         await s3Client.send(
           new PutObjectCommand({
             Bucket: resolvedOptions.bucketName,
+            Key: obj.key,
+            Body: obj.body,
+          })
+        );
+      }
+    },
+    async reset(): Promise<void> {
+      if (!bucketNameAfterStart) {
+        throw new Error('Preset not started; call start() first');
+      }
+      const region = sharedConnection?.getRegion() ?? resolvedOptions.region ?? 'us-east-1';
+      const credentials = sharedConnection
+        ? sharedConnection.getCredentials()
+        : { ...DEFAULT_CREDENTIALS };
+      const connectionUri = startedContainer
+        ? startedContainer.getConnectionUri()
+        : sharedConnection!.getConnectionUri();
+      const s3Client = createS3Client(connectionUri, region, credentials);
+      const sqsClient = createSqsClient(connectionUri, region, credentials);
+
+      let continuationToken: string | undefined;
+      do {
+        const listResponse = await s3Client.send(
+          new ListObjectsV2Command({
+            Bucket: bucketNameAfterStart,
+            ContinuationToken: continuationToken,
+          })
+        );
+        const contents = listResponse.Contents ?? [];
+        if (contents.length > 0) {
+          await s3Client.send(
+            new DeleteObjectsCommand({
+              Bucket: bucketNameAfterStart,
+              Delete: {
+                Objects: contents.map((obj) => ({ Key: obj.Key! })),
+                Quiet: true,
+              },
+            })
+          );
+        }
+        continuationToken = listResponse.NextContinuationToken;
+      } while (continuationToken);
+
+      const getQueueUrlResponse = await sqsClient.send(
+        new GetQueueUrlCommand({ QueueName: resolvedOptions.queueName })
+      );
+      const queueUrl = getQueueUrlResponse.QueueUrl;
+      if (queueUrl) {
+        await sqsClient.send(new PurgeQueueCommand({ QueueUrl: queueUrl }));
+      }
+
+      for (const obj of resolvedOptions.seedObjects ?? []) {
+        await s3Client.send(
+          new PutObjectCommand({
+            Bucket: bucketNameAfterStart,
             Key: obj.key,
             Body: obj.body,
           })

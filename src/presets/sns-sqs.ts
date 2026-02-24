@@ -2,6 +2,7 @@ import { CreateTopicCommand, PublishCommand, SNSClient, SubscribeCommand } from 
 import {
   CreateQueueCommand,
   GetQueueAttributesCommand,
+  PurgeQueueCommand,
   SetQueueAttributesCommand,
   SQSClient,
 } from '@aws-sdk/client-sqs';
@@ -105,6 +106,7 @@ export function createSnsSqsPreset(options?: SnsSqsPresetOptions): SnsSqsPreset 
   let startedContainer: Awaited<ReturnType<LocalstackContainer['start']>> | null = null;
   let sharedConnection: SharedConnection | null = null;
   let topicArnAfterStart: string | null = null;
+  let queueUrlAfterStart: string | null = null;
 
   return {
     get options(): SnsSqsPresetOptions {
@@ -132,6 +134,7 @@ export function createSnsSqsPreset(options?: SnsSqsPresetOptions): SnsSqsPreset 
       );
       const queueUrl = createQueueResponse.QueueUrl;
       if (!queueUrl) throw new Error('CreateQueue did not return QueueUrl');
+      queueUrlAfterStart = queueUrl;
 
       const topicResponse = await snsClient.send(
         new CreateTopicCommand({ Name: resolvedOptions.topicName })
@@ -170,6 +173,26 @@ export function createSnsSqsPreset(options?: SnsSqsPresetOptions): SnsSqsPreset 
         );
       }
     },
+    async reset(): Promise<void> {
+      if (!topicArnAfterStart || !queueUrlAfterStart) {
+        throw new Error('Preset not started; call start() first');
+      }
+      const region = sharedConnection?.getRegion() ?? resolvedOptions.region ?? 'us-east-1';
+      const credentials = sharedConnection
+        ? sharedConnection.getCredentials()
+        : { ...DEFAULT_CREDENTIALS };
+      const connectionUri = startedContainer
+        ? startedContainer.getConnectionUri()
+        : sharedConnection!.getConnectionUri();
+      const sqsClient = createSqsClient(connectionUri, region, credentials);
+      const snsClient = createSnsClient(connectionUri, region, credentials);
+      await sqsClient.send(new PurgeQueueCommand({ QueueUrl: queueUrlAfterStart }));
+      for (const message of resolvedOptions.seedMessages ?? []) {
+        await snsClient.send(
+          new PublishCommand({ TopicArn: topicArnAfterStart, Message: message })
+        );
+      }
+    },
     async stop(): Promise<void> {
       if (startedContainer) {
         await startedContainer.stop();
@@ -177,6 +200,7 @@ export function createSnsSqsPreset(options?: SnsSqsPresetOptions): SnsSqsPreset 
       }
       sharedConnection = null;
       topicArnAfterStart = null;
+      queueUrlAfterStart = null;
     },
     getTopicArn(): string {
       if (!topicArnAfterStart) {

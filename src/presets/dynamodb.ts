@@ -1,11 +1,14 @@
 import {
+  BatchWriteItemCommand,
   CreateTableCommand,
   DescribeTableCommand,
   DynamoDBClient,
   type KeySchemaElement,
   type AttributeDefinition,
   PutItemCommand,
+  ScanCommand,
 } from '@aws-sdk/client-dynamodb';
+import type { AttributeValue } from '@aws-sdk/client-dynamodb';
 import { marshall } from '@aws-sdk/util-dynamodb';
 import { LocalstackContainer } from '@testcontainers/localstack';
 import type { AwsPresetCredentials, AwsPresetOptions, LocalStackAwsPreset, SharedConnection } from '../index.js';
@@ -131,6 +134,52 @@ async function waitForTableActive(
   throw new Error(`Table ${tableName} did not become ACTIVE within ${maxWaitMs}ms`);
 }
 
+const BATCH_WRITE_MAX = 25;
+
+function keyFromItem(
+  item: Record<string, AttributeValue>,
+  partitionKeyName: string,
+  sortKeyName?: string
+): Record<string, AttributeValue> {
+  const key: Record<string, AttributeValue> = { [partitionKeyName]: item[partitionKeyName] };
+  if (sortKeyName && item[sortKeyName]) key[sortKeyName] = item[sortKeyName];
+  return key;
+}
+
+async function clearDynamoDBTable(
+  client: DynamoDBClient,
+  tableName: string,
+  partitionKeyName: string,
+  sortKeyName?: string
+): Promise<void> {
+  const keysToDelete: Record<string, AttributeValue>[] = [];
+  let lastEvaluatedKey: Record<string, AttributeValue> | undefined;
+  do {
+    const scanResponse = await client.send(
+      new ScanCommand({
+        TableName: tableName,
+        ExclusiveStartKey: lastEvaluatedKey,
+      })
+    );
+    const items = scanResponse.Items ?? [];
+    for (const item of items) {
+      keysToDelete.push(keyFromItem(item, partitionKeyName, sortKeyName));
+    }
+    lastEvaluatedKey = scanResponse.LastEvaluatedKey;
+  } while (lastEvaluatedKey);
+
+  for (let i = 0; i < keysToDelete.length; i += BATCH_WRITE_MAX) {
+    const chunk = keysToDelete.slice(i, i + BATCH_WRITE_MAX);
+    await client.send(
+      new BatchWriteItemCommand({
+        RequestItems: {
+          [tableName]: chunk.map((Key) => ({ DeleteRequest: { Key } })),
+        },
+      })
+    );
+  }
+}
+
 export function createDynamoDBPreset(options?: DynamoDBPresetOptions): DynamoDBPreset {
   validateDynamoDBPresetOptions(options);
   const partitionKey = options?.partitionKey ?? { name: DEFAULT_PARTITION_KEY, type: 'S' as const };
@@ -192,6 +241,33 @@ export function createDynamoDBPreset(options?: DynamoDBPresetOptions): DynamoDBP
             })
           );
         }
+      }
+    },
+    async reset(): Promise<void> {
+      if (!tableNameAfterStart) {
+        throw new Error('Preset not started; call start() first');
+      }
+      const connectionUri = startedContainer
+        ? startedContainer.getConnectionUri()
+        : sharedConnection!.getConnectionUri();
+      const credentials = sharedConnection
+        ? sharedConnection.getCredentials()
+        : { ...DEFAULT_CREDENTIALS };
+      const region = sharedConnection?.getRegion() ?? resolvedOptions.region ?? 'us-east-1';
+      const client = createDynamoDBClient(connectionUri, region, credentials);
+      await clearDynamoDBTable(
+        client,
+        tableNameAfterStart,
+        partitionKey.name,
+        sortKey?.name
+      );
+      for (const item of resolvedOptions.seedData ?? []) {
+        await client.send(
+          new PutItemCommand({
+            TableName: tableNameAfterStart,
+            Item: marshall(item),
+          })
+        );
       }
     },
     async stop(): Promise<void> {
