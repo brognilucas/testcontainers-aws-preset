@@ -1,6 +1,6 @@
 {
   "name": "testcontainers-aws-preset",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Testcontainers preset for AWS services",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -21,7 +21,8 @@
     "clean": "rm -rf dist",
     "test": "jest",
     "test:integration": "RUN_INTEGRATION=1 jest",
-    "prepublishOnly": "npm run build"
+    "prepublishOnly": "npm run build",
+    "release": "npm run build && npm publish --access public"
   },
   "keywords": [
     "testcontainers",
