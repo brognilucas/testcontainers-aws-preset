@@ -75,6 +75,10 @@ If the new preset should work with others in a single container, it must accept 
 
 The file **`templates/preset-template.ts`** is a skeleton that implements the contract above with placeholder names. Copy it to `src/presets/<service>.ts`, replace placeholders, then implement the TODO sections (AWS client creation, resource creation, seed application, reset logic).
 
+## Versioning and changelog
+
+The project follows [Semantic Versioning](https://semver.org/): MAJOR for breaking changes, MINOR for new features (backward compatible), PATCH for fixes. When preparing a release, update **CHANGELOG.md**: move entries from `[Unreleased]` into a new `[X.Y.Z] - YYYY-MM-DD` section and bump the version in `package.json`.
+
 ## Pull requests
 
 - Keep changes focused; prefer one preset or one concern per PR.

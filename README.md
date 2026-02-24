@@ -72,6 +72,10 @@ beforeEach(async () => {
 
 Create with `createSqsPreset()`, `createDynamoDBPreset()`, `createS3SqsPreset()`, etc. All expose `getConnectionConfig()` for building AWS SDK clients and support `reset()` to restore seed state without restarting the container.
 
+## Changelog and versioning
+
+We use [Semantic Versioning](https://semver.org/) (MAJOR.MINOR.PATCH). Breaking changes are released only in a new major version. See **[CHANGELOG.md](./CHANGELOG.md)** for release history and upgrade notes.
+
 ## License
 
 MIT
