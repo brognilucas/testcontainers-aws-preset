@@ -19,6 +19,8 @@ Integration tests start real LocalStack containers. Run them with:
 npm run test:integration
 ```
 
+CI runs on every push and pull request to `main`, runs the full test suite (unit + integration) against LocalStack, so every preset is verified before merge.
+
 ## Code and testing standards
 
 - Follow the project coding guidelines in **AGENTS.md** (naming, small functions, no explanatory comments, tests via public API).
